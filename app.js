@@ -6,6 +6,7 @@ const qrcode = require('qrcode');
 const http = require('http');
 const { phoneNumberFormatter } = require('./helpers/formatter');
 const fileUpload = require('express-fileupload');
+const cors = require('cors');
 
 const port = process.env.PORT || 8000;
 
