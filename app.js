@@ -4,7 +4,6 @@ const { body, validationResult } = require('express-validator');
 const socketIO = require('socket.io');
 const qrcode = require('qrcode');
 const http = require('http');
-const fs = require('fs');
 const { phoneNumberFormatter } = require('./helpers/formatter');
 const fileUpload = require('express-fileupload');
 
@@ -14,6 +13,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 
+app.use(cors());
 app.use(express.json());
 app.use(
   express.urlencoded({
@@ -25,17 +25,6 @@ app.use(
     debug: true
   })
 );
-
-app.use(function (req, res, next) {
-  //Enabling CORS
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS,POST,PUT');
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept, x-client-key, x-client-token, x-client-secret, Authorization'
-  );
-  next();
-});
 
 app.get('/', (req, res) => {
   res.sendFile('index.html', {
