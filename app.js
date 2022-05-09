@@ -1,14 +1,12 @@
-const { Client, MessageMedia } = require("whatsapp-web.js");
-const express = require("express");
-const { body, validationResult } = require("express-validator");
-const socketIO = require("socket.io");
-const qrcode = require("qrcode");
-const http = require("http");
-const fs = require("fs");
-const { phoneNumberFormatter } = require("./helpers/formatter");
-const fileUpload = require("express-fileupload");
-const axios = require("axios");
-const mime = require("mime-types");
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const express = require('express');
+const { body, validationResult } = require('express-validator');
+const socketIO = require('socket.io');
+const qrcode = require('qrcode');
+const http = require('http');
+const fs = require('fs');
+const { phoneNumberFormatter } = require('./helpers/formatter');
+const fileUpload = require('express-fileupload');
 
 const port = process.env.PORT || 8000;
 
@@ -19,98 +17,65 @@ const io = socketIO(server);
 app.use(express.json());
 app.use(
   express.urlencoded({
-    extended: true,
+    extended: true
   })
 );
 app.use(
   fileUpload({
-    debug: true,
+    debug: true
   })
 );
 
-const SESSION_FILE_PATH = "./whatsapp-session.json";
-let sessionCfg;
-if (fs.existsSync(SESSION_FILE_PATH)) {
-  sessionCfg = require(SESSION_FILE_PATH);
-}
-
 app.use(function (req, res, next) {
   //Enabling CORS
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,POST,PUT");
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS,POST,PUT');
   res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, x-client-key, x-client-token, x-client-secret, Authorization"
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept, x-client-key, x-client-token, x-client-secret, Authorization'
   );
   next();
 });
 
-app.get("/", (req, res) => {
-  res.sendFile("index.html", {
-    root: __dirname,
-  });
-});
-app.post("/logout", async (req, res) => {
-  client.logout();
-  return res.status(200).json({
-    status: true,
-    message: "success",
+app.get('/', (req, res) => {
+  res.sendFile('index.html', {
+    root: __dirname
   });
 });
 
 const client = new Client({
-  restartOnAuthFail: true,
-  puppeteer: {
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--unhandled-rejections=strict",
-    ],
-  },
-  session: sessionCfg,
+  authStrategy: new LocalAuth({})
 });
 
-client.on("message", (msg) => {
-  if (msg.body == "!ping") {
-    msg.reply("pong");
-  } else if (msg.body == "good morning") {
-    msg.reply("selamat pagi");
-  } else if (msg.body == "!groups") {
+client.on('message', (msg) => {
+  if (msg.body == '!ping') {
+    msg.reply('pong');
+  } else if (msg.body == 'good morning') {
+    msg.reply('selamat pagi');
+  } else if (msg.body == '!groups') {
     client.getChats().then((chats) => {
       const groups = chats.filter((chat) => chat.isGroup);
 
       if (groups.length == 0) {
-        msg.reply("You have no group yet.");
+        msg.reply('You have no group yet.');
       } else {
-        let replyMsg = "*YOUR GROUPS*\n\n";
+        let replyMsg = '*YOUR GROUPS*\n\n';
         groups.forEach((group, i) => {
           replyMsg += `ID: ${group.id._serialized}\nName: ${group.name}\n\n`;
         });
         replyMsg +=
-          "_You can use the group id to send a message to the group._";
+          '_You can use the group id to send a message to the group._';
         msg.reply(replyMsg);
       }
     });
   }
 });
 
-client.on("authenticated", (session) => {
-  console.log("AUTHENTICATED", session);
+client.on('authenticated', (session) => {
   sessionCfg = session;
-  fs.writeFile(SESSION_FILE_PATH, JSON.stringify(session), function (err) {
-    if (err) {
-      console.error(err);
-    }
-  });
 });
 
-client.on("disconnected", (reason) => {
-  // socket.emit("message", "Whatsapp is disconnected!");
-  fs.unlinkSync(SESSION_FILE_PATH, function (err) {
-    if (err) return console.log(err);
-    console.log("Session file deleted!");
-  });
+client.on('disconnected', (reason) => {
   client.destroy();
   client.initialize();
 });
@@ -118,31 +83,30 @@ client.on("disconnected", (reason) => {
 client.initialize();
 
 //Socket IO
-io.on("connection", function (socket) {
-  socket.emit("message", "Connecting...");
-  client.on("qr", (qr) => {
-    console.log("QR RECEIVED", qr);
+io.on('connection', function (socket) {
+  socket.emit('message', 'Connecting...');
+  client.on('qr', (qr) => {
     qrcode.toDataURL(qr, (err, url) => {
-      socket.emit("qr", url);
-      socket.emit("message", "QR Code received, scan please!");
+      socket.emit('qr', url);
+      socket.emit('message', 'QR Code received, scan please!');
     });
   });
-  client.on("auth_failure", function (session) {
-    socket.emit("message", "Auth failure, restarting...");
+  client.on('auth_failure', function (session) {
+    socket.emit('message', 'Auth failure, restarting...');
   });
-  client.on("ready", () => {
-    socket.emit("ready", "Whatsapp is ready!");
-    socket.emit("message", "Whatsapp is ready!");
+  client.on('ready', () => {
+    socket.emit('ready', 'Whatsapp is ready!');
+    socket.emit('message', 'Whatsapp is ready!');
   });
   client
     .getState()
     .then((data) => {
       console.log(data);
-      socket.emit("message", data);
-      if (data === "CONNECTED") {
-        return socket.emit("authenticated", "Whatsapp is authenticated!");
+      socket.emit('message', data);
+      if (data === 'CONNECTED') {
+        return socket.emit('authenticated', 'Whatsapp is authenticated!');
       }
-      socket.emit("message", data);
+      socket.emit('message', data);
     })
     .catch((err) => {
       console.log(err);
@@ -156,8 +120,8 @@ const checkRegisteredNumber = async function (number) {
 
 // Send message
 app.post(
-  "/sendmessage",
-  [body("number").notEmpty(), body("message").notEmpty()],
+  '/sendmessage',
+  [body('number').notEmpty(), body('message').notEmpty()],
   async (req, res) => {
     const errors = validationResult(req).formatWith(({ msg }) => {
       return msg;
@@ -167,7 +131,7 @@ app.post(
       console.log(errors.mapped());
       return res.status(422).json({
         status: false,
-        message: errors.mapped(),
+        message: errors.mapped()
       });
     }
 
@@ -177,20 +141,19 @@ app.post(
     const isRegisteredNumber = await checkRegisteredNumber(number);
 
     if (!isRegisteredNumber) {
-      console.log("The number is not registered");
+      console.log('The number is not registered');
       return res.status(422).json({
         status: false,
-        message: "The number is not registered",
+        message: 'The number is not registered'
       });
     }
 
     client
       .sendMessage(number, message)
       .then((response) => {
-        console.log(message);
         res.status(200).json({
           status: true,
-          response: response,
+          response: response
         });
       })
       .catch((err) => {
@@ -198,12 +161,12 @@ app.post(
 
         res.status(500).json({
           status: false,
-          response: err,
+          response: err
         });
       });
   }
 );
 
 server.listen(port, function () {
-  console.log("App running on *: " + port);
+  console.log('App running on *: ' + port);
 });
