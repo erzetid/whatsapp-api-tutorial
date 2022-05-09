@@ -5,14 +5,19 @@ const socketIO = require('socket.io');
 const qrcode = require('qrcode');
 const http = require('http');
 const fs = require('fs');
+const https = require('https');
+const privateKey = fs.readFileSync('sslcert/server.key', 'utf8');
+const certificate = fs.readFileSync('sslcert/server.crt', 'utf8');
 const { phoneNumberFormatter } = require('./helpers/formatter');
 const fileUpload = require('express-fileupload');
 
+const credentials = { key: privateKey, cert: certificate };
 const port = process.env.PORT || 8000;
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIO(server);
+const httpsServer = https.createServer(credentials, app);
+const io = socketIO(httpsServer);
 
 app.use(express.json());
 app.use(
@@ -170,3 +175,4 @@ app.post(
 server.listen(port, function () {
   console.log('App running on *: ' + port);
 });
+httpsServer.listen(8443);
